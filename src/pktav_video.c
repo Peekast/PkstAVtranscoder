@@ -25,7 +25,17 @@
 #define AUDIO_INDEX 1
 #define DEFAULT_PIX_FMT AV_PIX_FMT_YUV420P
 
-
+/**
+ * @brief Initialize a TAVContext structure.
+ * 
+ * This function initializes a TAVContext structure by setting its fields to default values, including pointers 
+ * to codec contexts, input and output streams, frames, and other necessary resources.
+ *
+ * @param ctx Pointer to a TAVContext structure to be initialized. If the pointer is NULL, the function does nothing.
+ * 
+ * @note This function sets all pointers in the structure to NULL and the codec type to -1. 
+ *       It prepares the structure for further setup or use in encoding/decoding processes.
+ */
 void init_TAVContext(TAVContext *ctx) {
     if (!ctx) return;
     ctx->codec_type = -1;
@@ -42,6 +52,18 @@ void init_TAVContext(TAVContext *ctx) {
     ctx->sws_ctx = NULL;
 }
 
+/**
+ * @brief Close and free all resources in a TAVContext structure.
+ * 
+ * This function releases and frees all allocated resources in the provided TAVContext structure, 
+ * including codec contexts, frames, audio FIFO buffer, resample and scaling contexts.
+ * After freeing the resources, the TAVContext structure is re-initialized to its default state using init_TAVContext().
+ *
+ * @param tavc Pointer to the TAVContext structure to be closed and cleaned. If NULL, the function does nothing.
+ * 
+ * @note This function ensures that all allocated resources within the TAVContext are properly freed to avoid memory leaks.
+ * @note After this function is called, the TAVContext is reset and can be safely reused if needed.
+ */
 void pktav_close_transcoder(TAVContext *tavc) {
     if (tavc == NULL) 
         return;
@@ -70,6 +92,25 @@ void pktav_close_transcoder(TAVContext *tavc) {
     init_TAVContext(tavc);
 }
 
+/**
+ * @brief Open and initialize the default transcoder for decoding and encoding.
+ * 
+ * This function initializes the decoder and encoder for a given input stream and audio configuration. 
+ * It allocates necessary resources such as input frames, decoder contexts, and encoder contexts, 
+ * and sets up the transcoder for processing media streams.
+ *
+ * @param stream Pointer to an AVStream containing the codec parameters for the input stream.
+ * @param config Pointer to a TAVConfigAudio structure that holds the configuration for the audio encoder.
+ * @param tavc Pointer to the TAVContext structure where the transcoder's state will be stored.
+ * 
+ * @return Returns 0 on success, or a negative AVERROR code on failure.
+ *         - AVERROR(ENOMEM) if memory allocation fails.
+ *         - AVERROR_DECODER_NOT_FOUND if the decoder is not found.
+ *         - AVERROR_ENCODER_NOT_FOUND if the encoder is not found.
+ * 
+ * @note The function allocates the input frame and codec contexts. In case of failure, it properly cleans up the allocated resources.
+ * @note If any error occurs during initialization, the function frees all allocated resources and returns the corresponding error code.
+ */
 int pktav_open_default_transcoder(AVStream *stream, TAVConfigAudio *config, TAVContext *tavc) {
     int error = 0;
 
@@ -125,6 +166,23 @@ cleanup_decode_error:
     return error;
 }
 
+/**
+ * @brief Configure the audio encoder based on the provided audio configuration and context.
+ * 
+ * This function sets up the audio encoder in the TAVContext using the configuration specified in 
+ * the TAVConfigAudio structure. It configures the channel layout, sample rate, sample format, 
+ * bitrate, and time base of the encoder.
+ *
+ * @param config Pointer to a TAVConfigAudio structure that contains the desired audio encoder configuration.
+ * @param tavc Pointer to the TAVContext structure where the encoder context will be configured.
+ * 
+ * @return Returns 0 on success or a negative AVERROR code if the encoder cannot be opened.
+ * 
+ * @note The function assumes that the decoder context has already been initialized, and it copies relevant properties 
+ *       (such as channel layout and sample rate) from the decoder to the encoder.
+ * @note The encoder is opened with `avcodec_open2` and the default sample format is taken from the first format 
+ *       available in the decoder's sample format list.
+ */
 static int pktav_config_audio_encoder(TAVConfigAudio *config, TAVContext *tavc) {
     av_channel_layout_default(&(tavc->encode_ctx->ch_layout), tavc->decode_ctx->ch_layout.nb_channels);
     tavc->encode_ctx->sample_rate    = tavc->decode_ctx->sample_rate;
@@ -135,6 +193,25 @@ static int pktav_config_audio_encoder(TAVConfigAudio *config, TAVContext *tavc) 
 
     return avcodec_open2(tavc->encode_ctx, tavc->encode_codec, NULL);
 }
+
+/**
+ * @brief Configure the video encoder based on the provided video configuration and context.
+ * 
+ * This function sets up the video encoder in the TAVContext using the settings specified in the 
+ * TAVConfigVideo structure. It configures the encoder's resolution, GOP size, framerate, pixel format, 
+ * and bitrate. The function also handles the selection between CRF or CBR modes based on the configuration.
+ *
+ * @param config Pointer to a TAVConfigVideo structure containing the desired video encoder configuration.
+ * @param tavc Pointer to the TAVContext structure where the video encoder context will be configured.
+ * 
+ * @return Returns 0 on success or a negative AVERROR code if any configuration or allocation fails.
+ *         - AVERROR(EINVAL) if invalid parameters are provided to the encoder options or scaling context.
+ *         - AVERROR(ENOMEM) if memory allocation for scaling or frames fails.
+ * 
+ * @note The function configures the encoder to use either CRF (if `config->crf` is set) or a fixed bitrate for CBR.
+ * @note If the decoder resolution is larger than the encoder's target resolution, a scaling context (SWS) is created.
+ * @note On failure, the function ensures that any allocated resources (like scaling context or frames) are properly freed.
+ */
 
 static int pktav_config_video_encoder(TAVConfigVideo *config, TAVContext *tavc) {
     tavc->encode_ctx->width = config->width;
@@ -154,14 +231,12 @@ static int pktav_config_video_encoder(TAVConfigVideo *config, TAVContext *tavc) 
         av_opt_set(tavc->encode_ctx->priv_data, "tune", "zerolatency", 0);
     }
     
-
     if (av_opt_set(tavc->encode_ctx->priv_data, "preset", config->preset, 0) < 0) {
         return AVERROR(EINVAL);
     }
     if (av_opt_set(tavc->encode_ctx->priv_data, "profile", config->profile, 0) < 0) {
         return AVERROR(EINVAL);
     }
-
 
     if (tavc->decode_ctx->width > tavc->encode_ctx->width && 
         tavc->decode_ctx->height > tavc->encode_ctx->height) {
@@ -184,7 +259,22 @@ static int pktav_config_video_encoder(TAVConfigVideo *config, TAVContext *tavc) 
     return avcodec_open2(tavc->encode_ctx, tavc->encode_codec, NULL);
 }
 
-
+/**
+ * @brief Open and configure a transcoder for either audio or video streams.
+ * 
+ * This function initializes the transcoder by first opening the default transcoder for the provided input stream 
+ * and then configuring the appropriate encoder (audio or video) based on the stream's codec type.
+ *
+ * @param stream Pointer to an AVStream containing the codec parameters for the input stream.
+ * @param config Pointer to either a TAVConfigAudio or TAVConfigVideo structure for configuring the encoder.
+ * @param tavc Pointer to the TAVContext structure that holds the transcoder's state and contexts.
+ * 
+ * @return Returns 0 on success, or a negative AVERROR code on failure.
+ *         - The error could be from the default transcoder opening or from the encoder configuration.
+ * 
+ * @note If the input stream is audio, it configures the audio encoder; if it is video, it configures the video encoder.
+ * @note On failure, the function ensures that all allocated resources are properly cleaned up by calling pktav_close_transcoder.
+ */
 int pktav_open_transcoder(AVStream *stream, void *config, TAVContext *tavc) {
     int error;
     if ((error = pktav_open_default_transcoder(stream, config, tavc)) < 0) 
@@ -201,6 +291,26 @@ int pktav_open_transcoder(AVStream *stream, void *config, TAVContext *tavc) {
     return error;
 }
 
+/**
+ * @brief Send a video packet to the decoder and process the resulting frames for encoding.
+ * 
+ * This function sends a compressed video packet to the decoder, receives the decoded frames, and either scales 
+ * the frame (if necessary) or sends it directly to the video encoder. The scaling is performed if the output 
+ * resolution is smaller than the input resolution, using the software scaling context (SWS).
+ *
+ * @param tavc Pointer to the TAVContext structure that holds the decoder, encoder, and frame contexts.
+ * @param packet Pointer to the AVPacket that contains the compressed video data to be decoded.
+ * 
+ * @return Returns 0 on success, or a negative AVERROR code on failure.
+ *         - AVERROR(EAGAIN) indicates that the encoder cannot accept new frames yet.
+ *         - AVERROR_EOF indicates that the decoder has finished processing the stream.
+ *         - Any other negative AVERROR code signals a failure in decoding, scaling, or encoding.
+ * 
+ * @note If scaling is required (i.e., if a scaling context is present), the function scales the decoded frame 
+ *       before sending it to the encoder. If no scaling is required, the decoded frame is sent directly.
+ * @note This function handles both the decoding and encoding steps and ensures that frames are unreferenced 
+ *       after being processed to free their resources.
+ */
 int pktav_send_video_packet(TAVContext *tavc, AVPacket *packet) {
     int error = 0;
 
@@ -243,6 +353,26 @@ int pktav_send_video_packet(TAVContext *tavc, AVPacket *packet) {
     return error == AVERROR_EOF || error == AVERROR(EAGAIN) ? 0 : error;
 }
 
+/**
+ * @brief Send an audio packet to the decoder and process the resulting frames for encoding.
+ * 
+ * This function sends a compressed audio packet to the decoder, receives the decoded audio frames, 
+ * and sends them to the audio encoder. If resampling is needed, the function can be extended to 
+ * handle audio resampling before encoding.
+ *
+ * @param tavc Pointer to the TAVContext structure that holds the decoder, encoder, and frame contexts.
+ * @param packet Pointer to the AVPacket that contains the compressed audio data to be decoded.
+ * 
+ * @return Returns 0 on success, or a negative AVERROR code on failure.
+ *         - AVERROR(EAGAIN) indicates that the encoder cannot accept new frames yet.
+ *         - AVERROR_EOF indicates that the decoder has finished processing the stream.
+ *         - Any other negative AVERROR code signals a failure in decoding or encoding.
+ * 
+ * @note The function currently sends decoded audio frames directly to the encoder. It includes 
+ *       a placeholder for resampling logic, which can be implemented if needed for format or rate conversions.
+ * @note After sending frames to the encoder, the function unreferences the input frame to free 
+ *       its resources and prepare it for the next packet.
+ */
 int pktav_send_audio_packet(TAVContext *tavc, AVPacket *packet) {
     int error = 0;
 
@@ -274,20 +404,62 @@ int pktav_send_audio_packet(TAVContext *tavc, AVPacket *packet) {
 }
 
 
-
+/**
+ * @brief Rescale video packet timestamps and adjust its duration.
+ * 
+ * This function adjusts the timestamps of a video packet to match the time base of the output stream. 
+ * It also recalculates the packet duration based on the input and output stream time bases and frame rates.
+ *
+ * @param input Pointer to the AVStream representing the input stream from which the packet originates.
+ * @param output Pointer to the AVStream representing the output stream to which the packet will be sent.
+ * @param packet Pointer to the AVPacket representing the video packet whose timestamps are to be rescaled.
+ * 
+ * @note The function sets the packet's stream index to VIDEO_INDEX and calculates the packet's duration using 
+ *       the time bases of the input and output streams, as well as the input stream's average frame rate.
+ * @note After adjusting the duration, the function uses `av_packet_rescale_ts` to rescale the packet's 
+ *       presentation and decoding timestamps to match the output stream's time base.
+ */
 static void pktav_rescale_video_packet(AVStream *input, AVStream *output, AVPacket *packet) {
     packet->stream_index = VIDEO_INDEX;
     packet->duration = input->time_base.den / output->time_base.num / input->avg_frame_rate.num * input->avg_frame_rate.den;
     av_packet_rescale_ts(packet, input->time_base, output->time_base);
 }
 
+/**
+ * @brief Rescale audio packet timestamps.
+ * 
+ * This function adjusts the timestamps of an audio packet to match the time base of the output stream.
+ *
+ * @param input Pointer to the AVStream representing the input stream from which the packet originates.
+ * @param output Pointer to the AVStream representing the output stream to which the packet will be sent.
+ * @param packet Pointer to the AVPacket representing the audio packet whose timestamps are to be rescaled.
+ * 
+ * @note The function sets the packet's stream index to AUDIO_INDEX and uses `av_packet_rescale_ts` to adjust 
+ *       the packet's presentation and decoding timestamps according to
+ */
 static void pktav_rescale_audio_packet(AVStream *input, AVStream *output, AVPacket *packet) {
     packet->stream_index = AUDIO_INDEX;
     av_packet_rescale_ts(packet, input->time_base, output->time_base);
 }
 
 
-
+/**
+ * @brief Receive a video packet from the encoder and rescale its timestamps.
+ * 
+ * This function receives an encoded video packet from the encoder context in the TAVContext. 
+ * Once the packet is successfully received, its timestamps are rescaled to match the time base of the output stream.
+ *
+ * @param tavc Pointer to the TAVContext structure that holds the encoding context and stream information.
+ * @param packet Pointer to the AVPacket where the encoded video data will be stored.
+ * 
+ * @return Returns 0 on success, or a negative AVERROR code on failure.
+ *         - AVERROR(EAGAIN) if the encoder needs more frames before producing a packet.
+ *         - AVERROR_EOF if the encoder has finished encoding the stream.
+ *         - AVERROR_INVALIDDATA if the TAVContext does not represent a video stream.
+ * 
+ * @note The function checks that the TAVContext is handling a video stream before attempting to receive a packet.
+ * @note On success, the packet's timestamps are rescaled using `pktav_rescale_video_packet` to match the output stream's time base.
+ */
 int pktav_recv_video_packet(TAVContext *tavc, AVPacket *packet) {
     int error;
     if (tavc->codec_type != AVMEDIA_TYPE_VIDEO) 
@@ -300,6 +472,23 @@ int pktav_recv_video_packet(TAVContext *tavc, AVPacket *packet) {
     return error;
 }
 
+/**
+ * @brief Receive an audio packet from the encoder and rescale its timestamps.
+ * 
+ * This function receives an encoded audio packet from the encoder context in the TAVContext. 
+ * Once the packet is successfully received, its timestamps are rescaled to match the time base of the output stream.
+ *
+ * @param tavc Pointer to the TAVContext structure that holds the encoding context and stream information.
+ * @param packet Pointer to the AVPacket where the encoded audio data will be stored.
+ * 
+ * @return Returns 0 on success, or a negative AVERROR code on failure.
+ *         - AVERROR(EAGAIN) if the encoder needs more frames before producing a packet.
+ *         - AVERROR_EOF if the encoder has finished encoding the stream.
+ *         - AVERROR_INVALIDDATA if the TAVContext does not represent an audio stream.
+ * 
+ * @note The function checks that the TAVContext is handling an audio stream before attempting to receive a packet.
+ * @note On success, the packet's timestamps are rescaled using `pktav_rescale_audio_packet` to match the output stream's time base.
+ */
 int pktav_recv_audio_packet(TAVContext *tavc, AVPacket *packet) {
     int error;
     if (tavc->codec_type != AVMEDIA_TYPE_AUDIO) 
@@ -445,12 +634,34 @@ cleanup:
     return error;
 } 
 
-long current_time_ms() {
+static long current_time_ms() {
     struct timespec spec;
     clock_gettime(CLOCK_MONOTONIC, &spec);
     return spec.tv_sec * 1000 + spec.tv_nsec / 1e6;
 }
 
+/**
+ * @brief Process and transcode an input media stream and send progress updates to the client.
+ * 
+ * This function handles the complete workflow of reading, transcoding, and writing audio and video streams 
+ * from an input format context to an output format context. It also calculates and sends progress updates 
+ * to a client over a socket as the transcoding progresses.
+ *
+ * @param socket The socket descriptor used to send status updates to the client.
+ * @param input The input media file or stream to be transcoded.
+ * @param mi Pointer to a TAVInfo structure containing metadata about the input media (e.g., packet counts).
+ * @param config_fmt Pointer to a TAVConfigFormat structure for configuring the output format.
+ * @param config_audio Pointer to a TAVConfigAudio structure for configuring the audio transcoder.
+ * @param config_video Pointer to a TAVConfigVideo structure for configuring the video transcoder.
+ * 
+ * @return Returns 0 on success, or a negative AVERROR code on failure.
+ * 
+ * @note The function initializes both the audio and video transcoders, processes each packet, and writes 
+ *       the transcoded data to the output context. It also calculates the current progress and sends 
+ *       periodic status updates to the client.
+ * @note In case of failure, the function ensures proper cleanup of all allocated resources, including 
+ *       packet memory, format contexts, and transcoder contexts.
+ */
 int pktav_worker(int socket, const char *input, TAVInfo *mi, TAVConfigFormat *config_fmt, TAVConfigAudio *config_audio, TAVConfigVideo *config_video) {
     int error = 0;
     AVStream *saudio = NULL;
