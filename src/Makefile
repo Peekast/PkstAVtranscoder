@@ -1,6 +1,6 @@
 # Definir el compilador
 CC = gcc
-VERSION = \"1.0.0\"
+VERSION = \"0.0.1\"
 
 CFLAGS = -fPIC -Wall -g3 -O0 $(shell pkg-config --cflags libavcodec libavdevice libavfilter libavformat libavutil libswresample libswscale jansson)
 LDFLAGS = $(shell pkg-config --libs libavcodec libavdevice libavfilter libavformat libavutil libswresample libswscale jansson)
