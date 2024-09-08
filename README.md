@@ -2,6 +2,7 @@
 Peekast Audio &amp; Video Transcoder
 
 - [ ] Comments
+- [ ] LIMPIAR LA COLA DEL ENCODER QUE QUEDAN 2 Frames!!
 - [ ] Soporte CBR para video
 - [ ] fork() a worker
 - [ ] Daemonize - (Definir)
