@@ -5,7 +5,6 @@
 #include "pktav_keyvalue.h"
 #include "pktav_strings.h"
 #include "pktav_error.h"
-// Function to split string
 
 size_t count_char(const char* str, char ch) {
     size_t count = 0;
@@ -80,46 +79,40 @@ int add_to_kv_list(KeyValueList **kv_list, const char *key, const char *value) {
         (*kv_list)->count = 0;
     }
 
-    // Reasigna memoria para un elemento adicional
     new_items = realloc((*kv_list)->items, ((*kv_list)->count + 1) * sizeof(KeyValue));
     if (new_items == NULL) {
-        return -OS_ERROR;  // Error al reasignar memoria
+        return -OS_ERROR; 
     }
     (*kv_list)->items = new_items;
 
-    // Añade el nuevo par clave-valor en el último espacio
     (*kv_list)->items[(*kv_list)->count].key = pkst_strdup(key);
     (*kv_list)->items[(*kv_list)->count].value = pkst_strdup(value);
 
-    // Incrementa la cuenta de elementos en la lista
     (*kv_list)->count++;
 
-    return 0;  // Éxito
+    return 0; 
 }
 
 char* kv_list_tostring(const KeyValueList* kv_list, char pair_delim, char kv_delim) {
     int i;
     size_t buffer_size = 0;
 
-    // Calcula el tamaño total necesario para la cadena.
     for (i = 0; i < kv_list->count; i++) {
         buffer_size += strlen(kv_list->items[i].key) + strlen(kv_list->items[i].value) + 2; // +2 para el '=' y el ';'
     }
 
-    // Reserva memoria para la cadena.
     char* buffer = calloc(1,buffer_size);
     if (buffer == NULL) {
-        return NULL; // Error al reservar memoria
+        return NULL;
     }
 
     char* ptr = buffer;
 
-    // Llena la cadena con los pares clave-valor.
     for (i = 0; i < kv_list->count; i++) {
         ptr += sprintf(ptr, "%s%c%s%c", kv_list->items[i].key, kv_delim, kv_list->items[i].value, pair_delim);
     }
 
-    *(ptr-1) = '\0'; // Reemplaza el último ';' con '\0'
+    *(ptr-1) = '\0'; 
 
     return buffer;
 }
@@ -131,11 +124,9 @@ const char* get_value_from_kv_list(KeyValueList *kv_list, const char *key) {
         }
     }
     pktav_errno = PK_ERROR_KEYNOTFOUND;
-    return NULL; // No se encontró la clave
+    return NULL;
 }
 
-
-// Function to free KeyValueList
 void free_kv_list(KeyValueList* kv_list) {
     for (int i = 0; i < kv_list->count; i++) {
         free(kv_list->items[i].key);

@@ -89,11 +89,11 @@ static void pktav_mediainfo_kv_dump(KeyValueList **kv_list, TAVInfo *info) {
     snprintf(buffer, sizeof(buffer), "%d", info->height);
     add_to_kv_list(kv_list, "height", buffer);
 
-    snprintf(buffer, sizeof(buffer), "%d", info->video_bitrate_kbps);
-    add_to_kv_list(kv_list, "video_bitrate_kbps", buffer);
+    snprintf(buffer, sizeof(buffer), "%d", info->video_bitrate_bps);
+    add_to_kv_list(kv_list, "video_bitrate_bps", buffer);
 
-    snprintf(buffer, sizeof(buffer), "%d", info->audio_bitrate_kbps);
-    add_to_kv_list(kv_list, "audio_bitrate_kbps", buffer);
+    snprintf(buffer, sizeof(buffer), "%d", info->audio_bitrate_bps);
+    add_to_kv_list(kv_list, "audio_bitrate_bps", buffer);
 
     snprintf(buffer, sizeof(buffer), "%f", info->fps);
     add_to_kv_list(kv_list, "fps", buffer);
