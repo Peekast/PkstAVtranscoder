@@ -12,8 +12,8 @@ typedef struct {
     int    audio_index;
     int    width;                  // Width of the video in the media.
     int    height;                 // Height of the video in the media.
-    int    video_bitrate_kbps;     // Bitrate of the video in the media in kbps.
-    int    audio_bitrate_kbps;     // Bitrate of the audio in the media in kbps.
+    int    video_bitrate_bps;     // Bitrate of the video in the media in kbps.
+    int    audio_bitrate_bps;     // Bitrate of the audio in the media in kbps.
     double fps;                    // Frame rate of the video in the media.
     int    audio_channels;         // Number of audio channels in the media.
     int    sample_rate;            // Sample rate of the audio in the media.

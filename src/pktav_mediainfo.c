@@ -6,7 +6,7 @@
 #include "pktav_error.h"
 
 
-static int pktav_count_packets(AVFormatContext *fmt, double *duration, int *audio_pkts, int *video_pkts) {
+static int pktav_count_packets(AVFormatContext *fmt, int video_index, int audio_index, double *duration, int *audio_pkts, int *video_pkts) {
     if (!duration || !audio_pkts || !video_pkts)
         return -1;
     
@@ -14,34 +14,22 @@ static int pktav_count_packets(AVFormatContext *fmt, double *duration, int *audi
     int64_t end_pts   = AV_NOPTS_VALUE;
     int64_t end_pts_duration = AV_NOPTS_VALUE;
     AVPacket pkt;
-
-    int video_stream_index = -1;
-
-    for (int i = 0; i < fmt->nb_streams; ++i) {
-        if (fmt->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-            video_stream_index = i;
-            break;
-        }
-    }
-    if (video_stream_index == -1) {
-        return AVERROR_STREAM_NOT_FOUND;
-    }
     
     while (av_read_frame(fmt, &pkt) >= 0) {
-        if (pkt.stream_index == video_stream_index) {
+        if (pkt.stream_index == video_index) {
             if (start_pts == AV_NOPTS_VALUE) {
                 start_pts = pkt.pts;
             }
             end_pts = pkt.pts;
             end_pts_duration = pkt.duration;
             (*video_pkts)++;
-        } else if (fmt->streams[pkt.stream_index]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO){
+        } else if (pkt.stream_index == audio_index){
             (*audio_pkts)++;
         }
         av_packet_unref(&pkt);
     }
 
-    AVStream* video_stream = fmt->streams[video_stream_index];
+    AVStream* video_stream = fmt->streams[video_index];
     if (start_pts != AV_NOPTS_VALUE && end_pts != AV_NOPTS_VALUE) {
         int64_t duration_pts = end_pts - start_pts + end_pts_duration;
         *duration = duration_pts * av_q2d(video_stream->time_base);
@@ -100,7 +88,7 @@ static int pkst_extract_mediainfo_from_avformat(AVFormatContext *fmt, TAVInfo **
         (*mi)->height = stream->codecpar->height;
 
         (*mi)->fps = av_q2d(stream->avg_frame_rate);
-        (*mi)->video_bitrate_kbps = stream->codecpar->bit_rate / 1000;
+        (*mi)->video_bitrate_bps = stream->codecpar->bit_rate;
 
         (*mi)->video_codec = pkst_alloc(strlen(avcodec_get_name(stream->codecpar->codec_id)));
         if ((*mi)->video_codec != NULL) {
@@ -110,7 +98,7 @@ static int pkst_extract_mediainfo_from_avformat(AVFormatContext *fmt, TAVInfo **
 
     if (audio_stream_index != -1) {
         stream = fmt->streams[audio_stream_index];
-        (*mi)->audio_bitrate_kbps = stream->codecpar->bit_rate / 1000;
+        (*mi)->audio_bitrate_bps = stream->codecpar->bit_rate;
         (*mi)->sample_rate = stream->codecpar->sample_rate;
         (*mi)->audio_channels = stream->codecpar->ch_layout.nb_channels;
         (*mi)->audio_codec = pkst_alloc(strlen(avcodec_get_name(stream->codecpar->codec_id)));
@@ -148,7 +136,7 @@ int pktav_extract_mediainfo_from_file(const char *filename, TAVInfo **mi) {
         double duration = 0;
         int audio_pkts  = 0;
         int video_pkts  = 0;
-        ret = pktav_count_packets(fmt, &duration, &audio_pkts, &video_pkts);
+        ret = pktav_count_packets(fmt, (*mi)->video_index, (*mi)->audio_index, &duration, &audio_pkts, &video_pkts);
         if (ret >= 0) {
             (*mi)->audio_packets = audio_pkts;
             (*mi)->video_packets = video_pkts;
@@ -183,7 +171,7 @@ void fprint_tavinfo(FILE *output, const TAVInfo *info) {
         "Video Packets: %d\n",
         info->format, info->duration, info->video_codec, info->audio_codec,
         info->video_index, info->audio_index, info->width, info->height,
-        info->video_bitrate_kbps, info->audio_bitrate_kbps, info->fps,
+        info->video_bitrate_bps, info->audio_bitrate_bps, info->fps,
         info->audio_channels, info->sample_rate, info->audio_packets, info->video_packets
     );
 }

@@ -20,9 +20,6 @@
 #define PKST_PAIR_DELIM '&'
 #define PKST_KV_DELIM   '='
 
-#define IS_VIDEO(f,p) ((f)->streams[(p)->stream_index]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) 
-#define IS_AUDIO(f,p) ((f)->streams[(p)->stream_index]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) 
-
 #define HANDLER_NAME "Media file produced by Peekast Media LLC (2024)."
 #define VIDEO_INDEX 0
 #define AUDIO_INDEX 1
@@ -534,7 +531,8 @@ int pktav_worker(int socket, const char *input, TAVInfo *mi, TAVConfigFormat *co
 
     start_time = current_time_ms();
     while ((error = av_read_frame(ifc, packet)) == 0) {
-        if (IS_VIDEO(ifc, packet)) {
+
+        if (packet->stream_index == mi->video_index) {
             vpkts++;
             error = pktav_send_video_packet(&tvideo, packet);
             if (error < 0) {
@@ -548,7 +546,7 @@ int pktav_worker(int socket, const char *input, TAVInfo *mi, TAVConfigFormat *co
                 av_interleaved_write_frame(ofc, packet);
                 av_packet_unref(packet);
             }
-        } else if (IS_AUDIO(ifc, packet)) {
+        } else if (packet->stream_index == mi->audio_index) {
             apkts++;
             error = pktav_send_audio_packet(&taudio, packet);
             if (error < 0) {

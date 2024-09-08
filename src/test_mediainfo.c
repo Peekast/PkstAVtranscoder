@@ -7,23 +7,7 @@
 #include "pktav_sigchld.h"
 #include "pktav_error.h"
 #include "pktav_log.h"
-
-#ifndef VERSION
-#define VERSION "undefined"
-#endif
-
-#ifndef COMPILER
-#define COMPILER "unknown"
-#endif
-
-#ifndef DATE
-#define DATE "unknown"
-#endif
-
-#ifndef TIME
-#define TIME "unknown"
-#endif
-
+#include "pktav_version.h"
 
 int main(int argc, char *argv[]) {
     int socket;
@@ -40,7 +24,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_SUCCESS);
     }
 
-    fprintf(stdout, "pktav-core version %s Copyright (c) 2022-2024 Peekast Media LLC\nbuild with: %s at: %s-%s\n", VERSION, COMPILER, DATE, TIME);
+    fprintf(stdout, "PkstAVTranscoder version %s Copyright (c) 2022-2024 Peekast Media LLC\nbuild with: %s at: %s-%s\n", VERSION, COMPILER, DATE, TIME);
 
     /*
      * Register the log callback for libav
@@ -120,8 +104,8 @@ int main(int argc, char *argv[]) {
                                 mi->height, 
                                 mi->video_codec, 
                                 mi->audio_codec, 
-                                mi->video_bitrate_kbps, 
-                                mi->audio_bitrate_kbps);
+                                mi->video_bitrate_bps, 
+                                mi->audio_bitrate_bps);
 
             err = send_mediainfo(client, mi);
             if (err < 0) {
@@ -152,6 +136,7 @@ int main(int argc, char *argv[]) {
                 send_status(client, &status);
             }
             pktav_log(NULL, 0, "Worker finish - End process -\n");
+            /* TODO: Limpiar Mediainfo struct */
             exit(EXIT_SUCCESS);
             break;
 
