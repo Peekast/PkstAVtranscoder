@@ -1,7 +1,7 @@
 # PkstAVtranscoder
 Peekast Audio &amp; Video Transcoder
 
-![Master Plan](https://github.com/Peekast/PkstAVtranscoder/blob/4fdfb46fdfe6119aa3abc736c2dea117cc4e7a37/Master-plan.png)
+![Master Plan](https://github.com/Peekast/PkstAVtranscoder/blob/515f413d48bc981b64b0fbc0fc3f40cf5484022a/Master-plan.png)
 
 - [ ] Comments
 - [ ] LIMPIAR LA COLA DEL ENCODER QUE QUEDAN 2 Frames!!
